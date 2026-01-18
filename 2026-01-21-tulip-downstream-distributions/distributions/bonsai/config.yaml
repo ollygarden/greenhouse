@@ -1,0 +1,76 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  hostmetrics:
+    collection_interval: 10s
+    scrapers:
+      cpu:
+      memory:
+
+processors:
+  batch:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 50
+    spike_limit_percentage: 30
+  resource:
+    attributes:
+    - key: pipeline.name
+      value: "bonsai"
+      action: insert
+
+exporters:
+  debug:
+    verbosity: detailed
+  otlp:
+    endpoint: "lgtm:4317"
+    tls:
+      insecure: true
+
+extensions:
+  health_check:
+  zpages:
+
+service:
+  extensions: [health_check, zpages]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [debug, otlp]
+    metrics:
+      receivers: [otlp, hostmetrics]
+      processors: [memory_limiter, resource, batch]
+      exporters: [debug, otlp]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [debug, otlp]
+  telemetry:
+    resource:
+      service.name: bonsai
+      service.namespace: ollygarden
+      service.version: 0.1.0
+      tulip.version: "25.11"
+    logs:
+      level: info
+    metrics:
+      level: detailed
+      readers:
+        - periodic:
+            interval: 15000
+            exporter:
+              otlp:
+                protocol: http/protobuf
+                endpoint: http://lgtm:4318
+    traces:
+      processors:
+        - batch:
+            exporter:
+              otlp:
+                protocol: http/protobuf
+                endpoint: http://lgtm:4318

@@ -13,4 +13,14 @@ Code, examples, and resources from OllyGarden live stream sessions.
 
 ---
 
+## 🛠️ Projects
+
+*   [**Bonsai**](./bonsai): A demo OpenTelemetry Collector distribution for the OllyGarden ecosystem.
+
+---
+
+## License
+
+Apache-2.0
+
 **OllyGarden** • [YouTube](https://youtube.com/@OllyGardenInc)

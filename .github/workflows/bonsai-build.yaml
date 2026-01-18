@@ -1,0 +1,32 @@
+name: Build Bonsai
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "bonsai/**"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "bonsai/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Build distribution
+        run: make build
+        working-directory: bonsai
+
+      - name: Validate configuration
+        run: make validate
+        working-directory: bonsai
