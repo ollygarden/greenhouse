@@ -1,0 +1,29 @@
+dist:
+  module: github.com/ollygarden/greenhouse/bonsai/distributions/bonsai
+  name: bonsai
+  description: OllyGarden Bonsai - Demo OpenTelemetry Collector Distribution
+  output_path: ./build
+  version: 0.137.0
+
+receivers:
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.137.0
+  # Added component not in Tulip manifest to demonstrate extensibility
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.137.0
+
+processors:
+  - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.137.0
+  - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.137.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.137.0
+
+exporters:
+  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.137.0
+  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.137.0
+
+extensions:
+  - gomod: go.opentelemetry.io/collector/extension/zpagesextension v0.137.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.137.0
+
+providers:
+  - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.43.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.43.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.43.0
