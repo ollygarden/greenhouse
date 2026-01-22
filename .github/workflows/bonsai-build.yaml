@@ -4,11 +4,11 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "bonsai/**"
+      - "2026-01-21-tulip-downstream-distributions/distributions/bonsai/**"
   pull_request:
     branches: ["main"]
     paths:
-      - "bonsai/**"
+      - "2026-01-21-tulip-downstream-distributions/distributions/bonsai/**"
   workflow_dispatch:
 
 jobs:
@@ -25,8 +25,8 @@ jobs:
 
       - name: Build distribution
         run: make build
-        working-directory: bonsai
+        working-directory: 2026-01-21-tulip-downstream-distributions/distributions/bonsai
 
       - name: Validate configuration
         run: make validate
-        working-directory: bonsai
+        working-directory: 2026-01-21-tulip-downstream-distributions/distributions/bonsai
