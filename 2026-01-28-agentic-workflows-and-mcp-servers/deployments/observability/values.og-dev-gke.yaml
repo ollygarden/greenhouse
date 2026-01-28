@@ -7,7 +7,7 @@ resources:
     cpu: 100m
     memory: 128Mi
 
-image: "otel/opentelemetry-collector-contrib:0.131.1"
+image: "otel/opentelemetry-collector-contrib:0.143.0"
 
 config:
   receivers:
