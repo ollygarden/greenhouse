@@ -1,0 +1,185 @@
+name: OTel Collector Changelog Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '2026-01-28-agentic-workflows-and-mcp-servers/deployments/observability/templates/otelCollector.yaml'
+      - '2026-01-28-agentic-workflows-and-mcp-servers/deployments/observability/values*.yaml'
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+env:
+  WIF_PROVIDER: ${{ secrets.WIF_PROVIDER }}
+  WIF_SA: ${{ secrets.WIF_SA }}
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-runners.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine runners
+        id: set-runners
+        run: |
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+
+          DEV='{"runner":"og-dev-runners","cluster":"og-dev-gke-cluster","project":"opportune-sylph-446521-p0","region":"europe-west4","values":"values.og-dev-gke.yaml"}'
+
+          # Check for base files (run on all clusters)
+          if echo "$CHANGED_FILES" | grep -qE 'deployments/observability/(templates/otelCollector\.yaml|values\.yaml)$'; then
+            MATRIX=$(jq -nc --argjson dev "$DEV" --argjson int "$INT" --argjson prod "$PROD" '{"include":[$dev,$int,$prod]}')
+          else
+            # Build matrix based on specific env files
+            INCLUDES="[]"
+
+            echo "$CHANGED_FILES" | grep -q 'values\.og-dev-gke\.yaml' && INCLUDES=$(echo "$INCLUDES" | jq --argjson e "$DEV" '. + [$e]')
+            echo "$CHANGED_FILES" | grep -q 'values\.og-internal-gke\.yaml' && INCLUDES=$(echo "$INCLUDES" | jq --argjson e "$INT" '. + [$e]')
+            echo "$CHANGED_FILES" | grep -q 'values\.og-ext-prod-gke\.yaml' && INCLUDES=$(echo "$INCLUDES" | jq --argjson e "$PROD" '. + [$e]')
+
+            MATRIX=$(jq -nc --argjson inc "$INCLUDES" '{"include":$inc}')
+          fi
+
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+
+  changelog-check:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.matrix != '{"include":[]}'
+    strategy:
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@71f986410dfbc7added4569d411d040a91dc6935 # v2.1.8
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SA }}
+
+      - name: Configure kubectl
+        env:
+          USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
+        run: |
+          gcloud container clusters get-credentials ${{ matrix.cluster }} \
+            --region=${{ matrix.region }} \
+            --project=${{ matrix.project }} \
+            --internal-ip 2>/dev/null || \
+          gcloud container clusters get-credentials ${{ matrix.cluster }} \
+            --region=${{ matrix.region }} \
+            --project=${{ matrix.project }}
+
+      - name: Install and start MCP server
+        run: |
+          curl -sLO https://github.com/niwoerner/opentelemetry-mcp-server/releases/latest/download/opentelemetry-mcp-server_Linux_x86_64.tar.gz
+          tar -xzf opentelemetry-mcp-server_Linux_x86_64.tar.gz
+          ./opentelemetry-mcp-server --protocol http --addr :9090 &
+
+      - name: Install opencode
+        run: |
+          curl -fsSL https://opencode.ai/install | bash
+          echo "$HOME/.opencode/bin" >> $GITHUB_PATH
+
+      - name: Setup opencode config
+        run: |
+          mkdir -p ~/.config/opencode
+          cat > ~/.config/opencode/config.json << 'EOF'
+          {
+            "$schema": "https://opencode.ai/config.json",
+            "mcp": {
+              "otel": {
+                "type": "remote",
+                "url": "http://127.0.0.1:9090/mcp"
+              }
+            }
+          }
+          EOF
+
+      - name: Run validation
+        id: validate
+        env:
+          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set +e
+          OUTPUT=$(opencode run --model google/gemini-3-pro-preview "You have MCP tools available. Execute this workflow:
+
+          STEP 1: Call tool 'getK8sCollectorsDiscoveryTool' - this returns all collectors with their component configs
+          STEP 2: For each collector found, call tool 'getK8sCollectorUpgradePathTool' with target_version='latest'
+          STEP 3: Analyze upgrade_path results - only report changes for components with non-empty user_config
+          DON'T use other mcp tools.
+
+          Output format per collector:
+
+          ### Collector: \`<collector-name>\`
+          **Namespace:** \`<namespace>\`
+          **Upgrade:** <current> -> <target>
+
+          <details>
+          <summary>Scanned Configuration</summary>
+
+          \`\`\`yaml
+          <user_config from discovery tool>
+          \`\`\`
+
+          </details>
+
+          #### Summary
+          **Action:** <Safe to upgrade | Review suggested | Manual changes needed>
+          **Why:** <1-2 sentence explanation>
+
+          #### Action Required
+          Config changes needed - show before/after YAML snippets with reference links
+
+          #### Behavioral Changes
+          | Version | Component | Change | Reference |
+
+          #### Bug Fixes
+          | Version | Component | Fix | Reference |
+
+          Rules:
+          - Only report changes for components where user_config is non-empty AND the change affects those configured fields
+          - Include the user_config from discovery in the collapsible section
+          - Omit empty sections, no emojis
+
+          Verify the returned output:
+          - Follows the expected output format strictly
+          - Provides a working link for the references
+          - Doesn't mention latest, instead the actual version number
+          - Collector config is included in the collapsible section
+          - No other text or emojis are included
+          - Only user action is required if the change affects the configured fields
+          ")
+          EXIT_CODE=$?
+          set -e
+
+          DELIMITER="VALIDATION_OUTPUT_$(date +%s)"
+          echo "output<<$DELIMITER" >> $GITHUB_OUTPUT
+          echo "$OUTPUT" >> $GITHUB_OUTPUT
+          echo "$DELIMITER" >> $GITHUB_OUTPUT
+
+      - name: Comment with validation result
+        uses: actions/github-script@v7
+        env:
+          VALIDATION_OUTPUT: ${{ steps.validate.outputs.output }}
+        with:
+          script: |
+            const output = process.env.VALIDATION_OUTPUT;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## OTel Collector Upgrade Analysis - \`${{ matrix.cluster }}\`
+
+            > This analysis compares your configured OTel Collector components against the upstream changelog.
+            > AI-generated content may be incomplete or inaccurate. Verify manually for critical workloads.
+
+            ${output}`
+            })

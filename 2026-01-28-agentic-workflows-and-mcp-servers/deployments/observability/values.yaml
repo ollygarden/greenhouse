@@ -1,0 +1,61 @@
+---
+# Name of the OpenTelemetry Collector
+name: otel-collector
+# Deployment mode (deployment  or daemonset)
+mode: deployment
+# Number of replicas
+replicas: 1
+# Node selector
+nodeSelector: {}
+# Autoscaler
+autoscaler: {}
+# Environment variables
+env: {}
+# Environment variables from secret
+envFrom: []
+# Resources
+resources: {}
+
+# Image
+image: "otel/opentelemetry-collector"
+
+# Config for the OpenTelemetry Collector
+config: {}
+
+externalSecrets:
+  enabled: false
+  secrets: {}
+  secretStoreName: "ollygarden"
+
+internal:
+  # Name of the OpenTelemetry Collector
+  name: otel-internal
+  # Deployment mode (deployment  or daemonset)
+  mode: deployment
+  # Number of replicas
+  replicas: 1
+  # Node selector
+  nodeSelector: {}
+  # Autoscaler
+  autoscaler: {}
+  # Environment variables
+  env: {}
+  # Environment variables from secret
+  envFrom: []
+  # Resources
+  resources: {}
+  
+  # Image
+  image: "otel/opentelemetry-collector"
+  
+  # Config for the OpenTelemetry Collector
+  config: {}
+  
+  externalSecrets:
+    enabled: false
+    secrets: {}
+    secretStoreName: "ollygarden"
+
+otelCR:
+  enabled: false
+  config: {}

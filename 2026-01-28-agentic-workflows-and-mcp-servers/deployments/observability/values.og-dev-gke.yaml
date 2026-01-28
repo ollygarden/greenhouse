@@ -1,0 +1,84 @@
+---
+externalSecrets:
+  enabled: true
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+image: "otel/opentelemetry-collector-contrib:0.131.1"
+
+config:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+  processors:
+    transform:
+      error_mode: ignore
+      trace_statements:
+        - set(resource.attributes["service.instance.id"], span.attributes["service.instance.id"])
+        - delete_key(span.attributes, "service.instance.id")
+  exporters:
+    otlphttp:
+      endpoint: http://lgtm:4318
+      auth:
+        authenticator: basicauth
+  extensions:
+    basicauth:
+      client_auth:
+        username: "admin"
+        password: "admin"
+  service:
+    extensions: [basicauth]
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [ ]
+        exporters: [otlphttp]
+      metrics:
+        receivers: [otlp]
+        processors: [ ]
+        exporters: [otlphttp]
+      logs:
+        receivers: [otlp]
+        processors: [ ]
+        exporters: [otlphttp]
+
+    telemetry:
+      resource:
+        "deployment.environment.name": "development"
+        "service.name": "opentelemetry-collector"
+      traces:
+        processors:
+          - batch:
+              exporter:
+                otlp:
+                  endpoint: http://lgtm:4318
+                  protocol: http/protobuf
+                  headers:
+                    Authorization: "Basic admin:admin"
+      metrics:
+        readers:
+          - periodic:
+              exporter:
+                otlp:
+                  endpoint: http://lgtm:4318
+                  headers:
+                    - name: Authorization
+                      value: Basic admin:admin
+                  protocol: http/protobuf
+              interval: 30000
+      logs:
+        processors:
+          - batch:
+              exporter:
+                otlp:
+                  endpoint: http://lgtm:4318
+                  protocol: http/protobuf
+                  headers:
+                    Authorization: "Basic admin:admin"
