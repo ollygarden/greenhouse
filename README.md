@@ -2,7 +2,10 @@
 
 Code, examples, and resources from OllyGarden live stream sessions.
 
-This is the actively maintained public collection of session artifacts. Each dated directory is a self-contained snapshot of its lesson. See [AGENTS.md](./AGENTS.md) for repository guidance and [CONTRIBUTING.md](./CONTRIBUTING.md) to help the examples grow.
+This is the actively maintained public collection of session artifacts. Each
+dated directory is a self-contained snapshot of its lesson. See
+[AGENTS.md](./AGENTS.md) for repository guidance and
+[CONTRIBUTING.md](./CONTRIBUTING.md) to help the examples grow.
 
 ---
 
