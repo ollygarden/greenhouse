@@ -20,7 +20,7 @@ jobs:
         working-directory: 2025-07-30-otel-for-programmers
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
         uses: actions/setup-go@v7
